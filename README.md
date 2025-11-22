@@ -1,8 +1,11 @@
 # DiscordBotTools
 
 This repository contains several Python scripts of mine for managing Discord bots and servers.
+
 (Docs are writen by AI because im too lazy, these are just for myself anyways)
+
 Each script is standalone and can be run independently.
+
 Below is documentation for each script and instructions on how to use them.
 
 ## Prerequisites
