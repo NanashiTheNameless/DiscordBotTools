@@ -1,0 +1,33 @@
+# Spellchecking config for crate-ci/typos
+
+[files]
+extend-exclude = [
+  ".git/",
+  ".vscode/",
+  "node_modules/",
+  "vscode-extension/",
+  "megalinter",
+  "report",
+  "package-lock.json",
+  ".pnpm-lock.json",
+]
+
+[default.extend-words]
+Nanashi = "Nanashi"
+NanashiTheNameless = "NanashiTheNameless"
+NamelessNanashi = "NamelessNanashi"
+argparser = "argparser"
+carceral = "carceral"
+discordpy = "discordpy"
+ECHR = "ECHR"
+enbyphobia = "enbyphobia"
+megalinter = "megalinter"
+oxsecurity = "oxsecurity"
+NNCL = "NNCL"
+paywalled = "paywalled"
+preinstallation = "preinstallation"
+queerphobia = "queerphobia"
+stefanzweifel = "stefanzweifel"
+sublicensable = "sublicensable"
+UDHR = "UDHR"
+venv = "venv"

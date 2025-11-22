@@ -14,9 +14,12 @@ APPLY_FIXES: all
 # default
 # ENABLE_LINTERS:
 
-# DISABLE:
-  # - COPYPASTE # Uncomment to disable checks of excessive copy-pastes
-  # - SPELL # Uncomment to disable checks of spelling mistakes
+DISABLE:
+  - PYTHON_PYLINT # Discord deps aren't available in CI, so Pylint import checks are noisy
+
+PYTHON_FLAKE8_CONFIG_FILE: .flake8
+MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.json
+SPELL_CSPELL_CONFIG_FILE: .cspell.json
 
 SHOW_ELAPSED_TIME: true
 

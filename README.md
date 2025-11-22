@@ -17,6 +17,7 @@ Below is documentation for each script and instructions on how to use them.
 ## Scripts
 
 ### 1. Delete_Bot_DMs_With_User.py
+
 Deletes this bot's messages in the DM channel with a specific user.
 
 - Prompts for token (or use `--token`).
@@ -24,12 +25,14 @@ Deletes this bot's messages in the DM channel with a specific user.
 - Throttle deletion with `--sleep` (seconds, default 0.3).
 
 **Usage:**
+
 ```bash
 python3 Delete_Bot_DMs_With_User.py --user-id 123456789012345678
 # or run without flags and fill prompts
 ```
 
 ### 2. List_Guild_Invites.py
+
 Lists active invites for a guild and can optionally create one.
 
 - Prompts for token (or use `--token`).
@@ -38,12 +41,14 @@ Lists active invites for a guild and can optionally create one.
 - Optional flags: `--include-revoked`, `--create`, `--only-if-none`, `--channel-id`, `--max-age`, `--max-uses`, `--temporary`, `--unique`, `--reason`.
 
 **Usage:**
+
 ```bash
 python3 List_Guild_Invites.py --guild-id 123456789012345678 --format json
 # or run without flags and fill prompts
 ```
 
 ### 3. List_Guilds.py
+
 Lists all guilds (servers) your bot is in.
 
 - Prompts for token (or use `--token`).
@@ -51,6 +56,7 @@ Lists all guilds (servers) your bot is in.
 - Optional flags: `--include-counts`, `--include-owner`.
 
 **Usage:**
+
 ```bash
 python3 List_Guilds.py --format json --include-owner
 # or run without flags and fill prompts
