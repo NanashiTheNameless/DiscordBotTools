@@ -7,6 +7,7 @@ import json
 import argparse
 import asyncio
 import getpass
+from typing import Any
 import discord # pyright: ignore[reportMissingImports]
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -54,7 +55,7 @@ async def main() -> int:
     client = discord.Client(intents=intents)
 
     done = asyncio.get_running_loop().create_future()
-    data = {"guilds": []}
+    data: dict[str, list[dict[str, Any]]] = {"guilds": []}
 
     @client.event
     async def on_ready():

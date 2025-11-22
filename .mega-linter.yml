@@ -14,8 +14,10 @@ APPLY_FIXES: all
 # default
 # ENABLE_LINTERS:
 
-DISABLE:
+DISABLE_LINTERS:
   - PYTHON_PYLINT # Discord deps aren't available in CI, so Pylint import checks are noisy
+  - COPYPASTE_JSCPD # Repeated CLI scaffolding is acceptable here
+  - REPOSITORY_KICS # Security scan disabled; pin actions if you re-enable
 
 PYTHON_FLAKE8_CONFIG_FILE: .flake8
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.json

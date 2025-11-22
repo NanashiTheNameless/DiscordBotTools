@@ -6,6 +6,7 @@
     "**/.pnpm-lock.json",
     ".vscode",
     "megalinter",
+    "megalinter-reports",
     "package-lock.json",
     "report"
   ],
@@ -23,6 +24,8 @@
     "enbyphobia",
     "megalinter",
     "oxsecurity",
+    "PYLINT",
+    "Pylint",
     "paywalled",
     "preinstallation",
     "queerphobia",

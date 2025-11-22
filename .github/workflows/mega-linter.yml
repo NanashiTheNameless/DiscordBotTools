@@ -3,6 +3,9 @@
 ---
 name: MegaLinter
 
+# Restrict default token permissions; jobs can elevate as needed
+permissions: read-all
+
 # Trigger mega-linter at every push. Action will also be visible from
 # Pull Requests to main
 on:
