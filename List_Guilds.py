@@ -2,39 +2,39 @@
 # This software is licensed under NNCL v1.2 see LICENSE.md for more info
 # https://github.com/NanashiTheNameless/DiscordBotTools/blob/main/LICENSE.md
 
-import sys
-import json
 import argparse
 import asyncio
 import getpass
+import json
+import sys
 from typing import Any
-import discord # pyright: ignore[reportMissingImports]
+
+import discord  # pyright: ignore[reportMissingImports]
+
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="List all Discord guilds (servers) a bot is in."
     )
-    p.add_argument(
-        "--token",
-        help="Bot token. If omitted, prompts."
-    )
+    p.add_argument("--token", help="Bot token. If omitted, prompts.")
     p.add_argument(
         "--format",
         choices=["text", "json", "csv"],
         default="text",
-        help="Output format."
+        help="Output format.",
     )
     p.add_argument(
         "--include-counts",
         action="store_true",
-        help="Include member_count (may be approximate without Members intent)."
+        help="Include member_count (may be approximate without Members intent).",
     )
     p.add_argument(
         "--include-owner",
         action="store_true",
-        help="Include owner_id (no additional permissions required)."
+        help="Include owner_id (no additional permissions required).",
     )
     return p
+
 
 async def main() -> int:
     args = build_argparser().parse_args()
@@ -125,6 +125,7 @@ async def main() -> int:
                 print(" • " + "  ".join(parts))
 
     return 0
+
 
 if __name__ == "__main__":
     try:

@@ -2,42 +2,80 @@
 # This software is licensed under NNCL v1.2 see LICENSE.md for more info
 # https://github.com/NanashiTheNameless/DiscordBotTools/blob/main/LICENSE.md
 
-import sys
 import argparse
 import asyncio
 import getpass
 import json
+import sys
 from datetime import timedelta
-import discord # pyright: ignore[reportMissingImports]
-from discord.errors import Forbidden, HTTPException, NotFound # pyright: ignore[reportMissingImports]
+
+import discord  # pyright: ignore[reportMissingImports]
+from discord.errors import (  # pyright: ignore[reportMissingImports]
+    Forbidden,
+    HTTPException,
+    NotFound,
+)
+
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="List active invite links for a Discord guild (server), optionally create one."
     )
     p.add_argument("--token", help="Bot token. If omitted, prompts.")
-    p.add_argument("--guild-id", type=int, help="Target guild (server) ID (prompts if omitted).")
-    p.add_argument("--format", choices=["text", "json", "csv"], default="text", help="Output format.")
-    p.add_argument("--include-revoked", action="store_true",
-                   help="Also show invites marked as revoked (API seldom returns these).")
+    p.add_argument(
+        "--guild-id", type=int, help="Target guild (server) ID (prompts if omitted)."
+    )
+    p.add_argument(
+        "--format",
+        choices=["text", "json", "csv"],
+        default="text",
+        help="Output format.",
+    )
+    p.add_argument(
+        "--include-revoked",
+        action="store_true",
+        help="Also show invites marked as revoked (API seldom returns these).",
+    )
 
-    p.add_argument("--create", action="store_true",
-                   help="Create a new invite (use --only-if-none to create only when there are no active invites).")
-    p.add_argument("--only-if-none", action="store_true",
-                   help="When used with --create, only create if no active invites exist.")
-    p.add_argument("--channel-id", type=int,
-                   help="Channel ID to create the invite in. If omitted, tries system channel or first text channel.")
-    p.add_argument("--max-age", type=int, default=0,
-                   help="Invite lifetime in seconds (0 = never expires). Default: 0.")
-    p.add_argument("--max-uses", type=int, default=0,
-                   help="Max uses (0 = unlimited). Default: 0.")
-    p.add_argument("--temporary", action="store_true",
-                   help="Grant temporary membership (kicks on disconnect unless role is added).")
-    p.add_argument("--unique", action="store_true",
-                   help="Always create a unique invite code even if one with similar settings exists.")
-    p.add_argument("--reason", default=None,
-                   help="Audit log reason for creating the invite.")
+    p.add_argument(
+        "--create",
+        action="store_true",
+        help="Create a new invite (use --only-if-none to create only when there are no active invites).",
+    )
+    p.add_argument(
+        "--only-if-none",
+        action="store_true",
+        help="When used with --create, only create if no active invites exist.",
+    )
+    p.add_argument(
+        "--channel-id",
+        type=int,
+        help="Channel ID to create the invite in. If omitted, tries system channel or first text channel.",
+    )
+    p.add_argument(
+        "--max-age",
+        type=int,
+        default=0,
+        help="Invite lifetime in seconds (0 = never expires). Default: 0.",
+    )
+    p.add_argument(
+        "--max-uses", type=int, default=0, help="Max uses (0 = unlimited). Default: 0."
+    )
+    p.add_argument(
+        "--temporary",
+        action="store_true",
+        help="Grant temporary membership (kicks on disconnect unless role is added).",
+    )
+    p.add_argument(
+        "--unique",
+        action="store_true",
+        help="Always create a unique invite code even if one with similar settings exists.",
+    )
+    p.add_argument(
+        "--reason", default=None, help="Audit log reason for creating the invite."
+    )
     return p
+
 
 def invite_record(inv: discord.Invite) -> dict:
     expires_at = None
@@ -53,7 +91,11 @@ def invite_record(inv: discord.Invite) -> dict:
         "channel_id": getattr(inv.channel, "id", None),
         "channel_name": getattr(inv.channel, "name", None),
         "inviter_id": getattr(inv.inviter, "id", None),
-        "inviter_name": getattr(inv.inviter, "name", None) if getattr(inv, "inviter", None) else None,
+        "inviter_name": (
+            getattr(inv.inviter, "name", None)
+            if getattr(inv, "inviter", None)
+            else None
+        ),
         "uses": inv.uses,
         "max_uses": inv.max_uses,
         "temporary": inv.temporary,
@@ -63,10 +105,15 @@ def invite_record(inv: discord.Invite) -> dict:
         "expires_at": expires_at.isoformat() if expires_at else None,
     }
 
-async def choose_channel_for_invite(guild: discord.Guild, preferred_id: int | None) -> discord.abc.GuildChannel | None:
+
+async def choose_channel_for_invite(
+    guild: discord.Guild, preferred_id: int | None
+) -> discord.abc.GuildChannel | None:
     if preferred_id:
         try:
-            ch = guild.get_channel(preferred_id) or await guild.fetch_channel(preferred_id)
+            ch = guild.get_channel(preferred_id) or await guild.fetch_channel(
+                preferred_id
+            )
             return ch
         except (NotFound, Forbidden, HTTPException):
             return None
@@ -78,6 +125,7 @@ async def choose_channel_for_invite(guild: discord.Guild, preferred_id: int | No
         if hasattr(ch, "create_invite"):
             return ch
     return None
+
 
 def prompt_for_int(prompt_text: str) -> int | None:
     while True:
@@ -91,6 +139,7 @@ def prompt_for_int(prompt_text: str) -> int | None:
             return int(raw)
         except ValueError:
             print("Please enter digits only.", file=sys.stderr)
+
 
 async def main() -> int:
     args = build_argparser().parse_args()
@@ -130,7 +179,10 @@ async def main() -> int:
                     guild = None
 
             if guild is None:
-                print("Error: Bot is not in that guild or cannot access it.", file=sys.stderr)
+                print(
+                    "Error: Bot is not in that guild or cannot access it.",
+                    file=sys.stderr,
+                )
                 done.set_result(False)
                 return
 
@@ -147,7 +199,10 @@ async def main() -> int:
             if should_create:
                 channel = await choose_channel_for_invite(guild, args.channel_id)
                 if channel is None:
-                    print("Error: Could not resolve a channel to create an invite in.", file=sys.stderr)
+                    print(
+                        "Error: Could not resolve a channel to create an invite in.",
+                        file=sys.stderr,
+                    )
                 else:
                     try:
                         new_inv = await channel.create_invite(
@@ -160,9 +215,15 @@ async def main() -> int:
                         created_rec = invite_record(new_inv)
                         invites.append(new_inv)
                     except Forbidden:
-                        print("Error: Forbidden creating invite. Ensure the bot has CREATE_INSTANT_INVITE on that channel.", file=sys.stderr)
+                        print(
+                            "Error: Forbidden creating invite. Ensure the bot has CREATE_INSTANT_INVITE on that channel.",
+                            file=sys.stderr,
+                        )
                     except HTTPException as e:
-                        print(f"Error: HTTP error when creating invite: {e}", file=sys.stderr)
+                        print(
+                            f"Error: HTTP error when creating invite: {e}",
+                            file=sys.stderr,
+                        )
 
             for inv in invites:
                 rec = invite_record(inv)
@@ -173,7 +234,9 @@ async def main() -> int:
             if created_rec:
                 results["created_invite"] = created_rec
 
-            results["invites"].sort(key=lambda r: (r.get("channel_name") or "", r.get("code") or ""))
+            results["invites"].sort(
+                key=lambda r: (r.get("channel_name") or "", r.get("code") or "")
+            )
             done.set_result(True)
         except Exception as exc:
             done.set_exception(exc)
@@ -207,10 +270,19 @@ async def main() -> int:
         print()
     elif fmt == "csv":
         headers = [
-            "url", "code", "channel_id", "channel_name",
-            "inviter_id", "inviter_name",
-            "uses", "max_uses", "temporary", "revoked",
-            "max_age_seconds", "created_at", "expires_at",
+            "url",
+            "code",
+            "channel_id",
+            "channel_name",
+            "inviter_id",
+            "inviter_name",
+            "uses",
+            "max_uses",
+            "temporary",
+            "revoked",
+            "max_age_seconds",
+            "created_at",
+            "expires_at",
         ]
         print(",".join(headers))
         for r in invites:
@@ -245,6 +317,7 @@ async def main() -> int:
                 print(" • " + line)
 
     return 0
+
 
 if __name__ == "__main__":
     try:

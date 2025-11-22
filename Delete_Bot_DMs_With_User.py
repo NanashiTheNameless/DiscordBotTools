@@ -2,12 +2,18 @@
 # This software is licensed under NNCL v1.2 see LICENSE.md for more info
 # https://github.com/NanashiTheNameless/DiscordBotTools/blob/main/LICENSE.md
 
-import sys
 import argparse
 import asyncio
 import getpass
-import discord # pyright: ignore[reportMissingImports]
-from discord.errors import Forbidden, HTTPException, NotFound # pyright: ignore[reportMissingImports]
+import sys
+
+import discord  # pyright: ignore[reportMissingImports]
+from discord.errors import (  # pyright: ignore[reportMissingImports]
+    Forbidden,
+    HTTPException,
+    NotFound,
+)
+
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -22,6 +28,7 @@ def build_argparser() -> argparse.ArgumentParser:
         help="Delay (seconds) between deletions to avoid rate limits. Default: 0.3",
     )
     return p
+
 
 async def main() -> int:
     args = build_argparser().parse_args()
@@ -77,7 +84,10 @@ async def main() -> int:
             try:
                 dm_channel = await user.create_dm()
             except HTTPException as exc:
-                print(f"Error: Could not create or fetch DM channel: {exc}", file=sys.stderr)
+                print(
+                    f"Error: Could not create or fetch DM channel: {exc}",
+                    file=sys.stderr,
+                )
                 done.set_result(False)
                 return
 
@@ -99,10 +109,16 @@ async def main() -> int:
                         await asyncio.sleep(args.sleep)  # be gentle with rate limits
                 except Forbidden:
                     stats["failed"] += 1
-                    print(f"Forbidden: could not delete message {message.id}", file=sys.stderr)
+                    print(
+                        f"Forbidden: could not delete message {message.id}",
+                        file=sys.stderr,
+                    )
                 except HTTPException as exc:
                     stats["failed"] += 1
-                    print(f"HTTP error deleting message {message.id}: {exc}", file=sys.stderr)
+                    print(
+                        f"HTTP error deleting message {message.id}: {exc}",
+                        file=sys.stderr,
+                    )
 
             done.set_result(True)
         except Exception as exc:
@@ -127,8 +143,11 @@ async def main() -> int:
     if not done.result():
         return 1
 
-    print(f"Done. Deleted {stats['deleted']} messages. Failed to delete {stats['failed']} messages.")
+    print(
+        f"Done. Deleted {stats['deleted']} messages. Failed to delete {stats['failed']} messages."
+    )
     return 0
+
 
 if __name__ == "__main__":
     try:

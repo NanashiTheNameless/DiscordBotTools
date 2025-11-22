@@ -24,6 +24,5 @@ MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.json
 SPELL_CSPELL_CONFIG_FILE: .cspell.json
 
 SHOW_ELAPSED_TIME: true
-
 # Uncomment if you want MegaLinter to detect errors but not block CI to pass
 # DISABLE_ERRORS: true
