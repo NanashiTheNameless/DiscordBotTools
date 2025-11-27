@@ -67,7 +67,7 @@ python3 List_Guilds.py --format json --include-owner
 1. Clone this repository:
 
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/NanashiTheNameless/DiscordBotTools
    cd DiscordBotTools
    ```
 
