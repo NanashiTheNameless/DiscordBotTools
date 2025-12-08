@@ -19,12 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
           persist-credentials: false
 
       - name: Install typos
-        uses: crate-ci/typos@a1a16c7b7c25d1c27cc750525aada8b9ae68b716
+        uses: crate-ci/typos@213329406d908367bf5cab5e617b1c918c2f4b75
         env:
           INSTALL_DIR: ${{ runner.temp }}
         with:
@@ -39,7 +39,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Create Pull Request with fixes
-        uses: NanashiTheNameless/create-pull-request@54090d376ec2f57a75a38f70e405cdf68933eed4
+        uses: NanashiTheNameless/create-pull-request@796d320ac5352cafa0d05d25dd5a637e6af25fb3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/typos-auto-fixes
