@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# This software is licensed under NNCL v1.2 see LICENSE.md for more info
+# This software is licensed under NNCL v1.3 see LICENSE.md for more info
 # https://github.com/NanashiTheNameless/DiscordBotTools/blob/main/LICENSE.md
 
 import argparse
