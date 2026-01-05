@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
 
       - name: Install typos
-        uses: crate-ci/typos@345d4becf96f1a00e3dcd7fe1104a7169d8bdc22
+        uses: crate-ci/typos@5c19779cb52ea50e151f5a10333ccd269227b5ae
         env:
           INSTALL_DIR: ${{ runner.temp }}
         with:
