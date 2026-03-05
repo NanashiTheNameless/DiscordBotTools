@@ -29,7 +29,32 @@ Delete this bot's messages in a DM channel with a specific user.
 Example:
 
 ```bash
-python3 Delete_Bot_DMs_With_User.py --user-id 123456789012345678
+python3.14 Delete_Bot_DMs_With_User.py --user-id 123456789012345678
+```
+
+### `_Bot.py`
+
+Interactive DM terminal as the bot for one user.
+
+- `--token` (prompts if omitted)
+- `--user-id` (prompts if omitted)
+- `--history` default messages shown for initial view and `/list` (default: `10`)
+- New incoming DM messages are printed live while the terminal is open
+
+Commands inside the terminal:
+
+- Plain text sends a message
+- `/list [count]` show recent messages
+- `/edit <message_id> <text>` edit one of the bot's messages
+- `/delete <message_id>` delete one of the bot's messages
+- `/edit-last <text>` edit the most recent bot message
+- `/delete-last` delete the most recent bot message
+- `/help`, `/quit`
+
+Example:
+
+```bash
+python3.14 _Bot.py --user-id 123456789012345678
 ```
 
 ### `Get_Guild_Owner.py`
@@ -42,7 +67,7 @@ Get owner information for a guild the bot can access.
 Example:
 
 ```bash
-python3 Get_Guild_Owner.py --guild-id 123456789012345678
+python3.14 Get_Guild_Owner.py --guild-id 123456789012345678
 ```
 
 ### `Leave_Guild.py`
@@ -55,7 +80,7 @@ Make the bot leave a guild.
 Example:
 
 ```bash
-python3 Leave_Guild.py --guild-id 123456789012345678
+python3.14 Leave_Guild.py --guild-id 123456789012345678
 ```
 
 ### `List_Guild_Invites.py`
@@ -73,7 +98,7 @@ List active invites for a guild and optionally create a new invite.
 Example:
 
 ```bash
-python3 List_Guild_Invites.py --guild-id 123456789012345678 --format json
+python3.14 List_Guild_Invites.py --guild-id 123456789012345678 --format json
 ```
 
 ### `List_Guilds.py`
@@ -88,7 +113,7 @@ List all guilds the bot is in.
 Example:
 
 ```bash
-python3 List_Guilds.py --format json --include-owner
+python3.14 List_Guilds.py --format json --include-owner
 ```
 
 ## Notes
