@@ -18,13 +18,27 @@ python3.14 -m pip install --upgrade git+https://github.com/NanashiTheNameless/di
 
 ## Available Scripts
 
+Common behavior across scripts:
+
+- If `--token` is omitted, the script prompts for the bot token.
+- If a required ID flag is omitted (`--user-id` / `--guild-id`), the script prompts for it.
+- IDs must be numeric Discord snowflakes.
+
 ### `Delete_Bot_DMs_With_User.py`
 
 Delete the bot's messages in a DM channel with a specific user.
 
-- `--token` (prompts if omitted)
-- `--user-id` (prompts if omitted)
-- `--sleep` delay between deletions (default: `0.3`)
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--user-id <user_id>`: Target user's ID. If omitted, prompts until valid numeric input.
+- `--sleep <seconds>`: Delay between deleting each bot-authored message in that DM.
+  Default is `0.3`. Use `0` to disable the extra delay.
+
+Notes:
+
+- Only messages sent by the bot are deleted.
+- Messages are processed oldest-to-newest.
 
 Example:
 
@@ -36,21 +50,29 @@ python3.14 Delete_Bot_DMs_With_User.py --user-id 123456789012345678
 
 Interactive DM terminal as the bot for one user.
 
-- `--token` (prompts if omitted)
-- `--user-id` (prompts if omitted)
-- `--history` default messages shown for initial view and `/list` (default: `10`)
-- New incoming DM messages are printed live while the terminal is open
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--user-id <user_id>`: Target user's ID. If omitted, prompts until valid numeric input.
+- `--history <count>`: Number of recent DM messages shown on connect, and the default
+  count used by `/list` with no argument. Default is `10`. Runtime display is clamped
+  to `1-100`.
+
+Behavior:
+
+- New incoming DM messages from the target user are printed live while the terminal is open.
 
 Commands inside the terminal:
 
-- Plain text sends a message
-- `/list [count]` show recent messages
-- `/edit <message_id> <text>` edit one of the bot's messages
-- `/delete <message_id>` delete one of the bot's messages
-- `/edit-last <text>` edit the most recent bot message
-- `/delete-last` delete the most recent bot message
-- `/quit`, `/exit` exit the terminal
-- `/help` show command help
+- Plain text: send that text as a new DM.
+- `/send <text>`: explicit send command (same effect as plain text).
+- `/list [count]`: show recent messages (count is clamped to `1-100`).
+- `/edit <message_id> <text>`: edit one of the bot's messages.
+- `/delete <message_id>`: delete one of the bot's messages.
+- `/edit-last <text>`: edit the most recent bot message found in that DM.
+- `/delete-last`: delete the most recent bot message found in that DM.
+- `/quit`, `/exit`: exit the terminal.
+- `/help`: show command help.
 
 Example:
 
@@ -62,8 +84,15 @@ python3.14 DM_As_Bot.py --user-id 123456789012345678
 
 Get owner information for a guild the bot can access.
 
-- `--token` (prompts if omitted)
-- `--guild-id` (prompts if omitted)
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--guild-id <guild_id>`: Guild ID to inspect. If omitted, prompts until valid numeric input.
+
+Output:
+
+- Guild name and ID.
+- Owner ID (and owner username if the user lookup succeeds).
 
 Example:
 
@@ -75,8 +104,14 @@ python3.14 Get_Guild_Owner.py --guild-id 123456789012345678
 
 Make the bot leave a guild.
 
-- `--token` (prompts if omitted)
-- `--guild-id` (prompts if omitted)
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--guild-id <guild_id>`: Guild ID to leave. If omitted, prompts until valid numeric input.
+
+Note:
+
+- The bot must already be in the guild for this to succeed.
 
 Example:
 
@@ -88,13 +123,27 @@ python3.14 Leave_Guild.py --guild-id 123456789012345678
 
 List active invites for a guild and optionally create a new invite.
 
-- `--token` (prompts if omitted)
-- `--guild-id` (prompts if omitted)
-- `--format text|json|csv` (default: `text`)
-- `--include-revoked`
-- Invite creation options:
-  `--create`, `--only-if-none`, `--channel-id`, `--max-age`, `--max-uses`,
-  `--temporary`, `--unique`, `--reason`
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--guild-id <guild_id>`: Guild ID to inspect. If omitted, prompts until valid numeric input.
+- `--format <text|json|csv>`: Output format. Default: `text`.
+- `--include-revoked`: Include invites marked as revoked (if Discord API returns them).
+
+Invite creation flags:
+
+- `--create`: Create a new invite in addition to listing invites.
+- `--only-if-none`: Only create if there are currently no invites found.
+  Has effect only when combined with `--create`.
+- `--channel-id <channel_id>`: Channel to create the invite in.
+  If omitted, script tries guild system channel, then first text channel, then first invite-capable channel.
+- `--max-age <seconds>`: Invite lifetime in seconds. `0` means no expiration.
+  Default: `0`.
+- `--max-uses <count>`: Maximum uses. `0` means unlimited uses.
+  Default: `0`.
+- `--temporary`: Create a temporary-membership invite.
+- `--unique`: Force a unique invite code instead of reusing similar existing invite settings.
+- `--reason <text>`: Audit log reason used for invite creation.
 
 Example:
 
@@ -106,10 +155,13 @@ python3.14 List_Guild_Invites.py --guild-id 123456789012345678 --format json
 
 List all guilds the bot is in.
 
-- `--token` (prompts if omitted)
-- `--format text|json|csv` (default: `text`)
-- `--include-counts`
-- `--include-owner`
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--format <text|json|csv>`: Output format. Default: `text`.
+- `--include-counts`: Include `member_count` in output.
+  This count may be approximate without privileged member intent.
+- `--include-owner`: Include `owner_id` in output.
 
 Example:
 
