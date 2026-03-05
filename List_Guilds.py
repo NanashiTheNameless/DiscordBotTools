@@ -117,7 +117,7 @@ async def main() -> int:
             print("No guilds found.")
         else:
             for g in guilds:
-                parts = [f'{g["name"]} (id={g["id"]})']
+                parts = [f'{g["name"]} ({g["id"]})']
                 if args.include_owner and g.get("owner_id") is not None:
                     parts.append(f'owner_id={g["owner_id"]}')
                 if args.include_counts and g.get("member_count") is not None:
