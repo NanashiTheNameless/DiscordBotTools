@@ -5,7 +5,7 @@ Small standalone scripts for managing Discord bots and guilds.
 ## Requirements
 
 - Python 3.10+
-- Secure `discord.py` (`pip install git+https://github.com/NanashiTheNameless/discord.py`)
+- Secure `discord.py` (like <https://github.com/NanashiTheNameless/discord.py>)
 - A Discord bot token
 
 ## Setup
