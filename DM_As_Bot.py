@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import getpass
 import sys
+from types import ModuleType
 
 import discord  # pyright: ignore[reportMissingImports]
 from discord.errors import (  # pyright: ignore[reportMissingImports]
@@ -14,8 +15,11 @@ from discord.errors import (  # pyright: ignore[reportMissingImports]
     NotFound,
 )
 
+readline: ModuleType | None
 try:
-    import readline
+    import readline as _readline
+
+    readline = _readline
 except ImportError:
     readline = None
 
@@ -187,7 +191,9 @@ async def run_terminal(
                 print("Error: Forbidden to send message in this DM.", file=sys.stderr)
                 return
             except HTTPException as exc:
-                print(f"Error: HTTP error while sending message: {exc}", file=sys.stderr)
+                print(
+                    f"Error: HTTP error while sending message: {exc}", file=sys.stderr
+                )
                 return
             last_bot_message_id = message.id
             sent_text = normalize_content(message.content or "")
@@ -225,7 +231,7 @@ async def run_terminal(
             if last_bot_message_id is None:
                 print("Error: No previous bot message to edit.", file=sys.stderr)
                 continue
-            new_content = line[len("/edit-last "):].strip()
+            new_content = line[len("/edit-last ") :].strip()
             if not new_content:
                 print("Error: New message content cannot be empty.", file=sys.stderr)
                 continue
@@ -240,7 +246,9 @@ async def run_terminal(
             except Forbidden:
                 print("Error: Forbidden to edit this message.", file=sys.stderr)
             except HTTPException as exc:
-                print(f"Error: HTTP error while editing message: {exc}", file=sys.stderr)
+                print(
+                    f"Error: HTTP error while editing message: {exc}", file=sys.stderr
+                )
             continue
 
         if line == "/delete-last":
@@ -261,7 +269,9 @@ async def run_terminal(
             except Forbidden:
                 print("Error: Forbidden to delete this message.", file=sys.stderr)
             except HTTPException as exc:
-                print(f"Error: HTTP error while deleting message: {exc}", file=sys.stderr)
+                print(
+                    f"Error: HTTP error while deleting message: {exc}", file=sys.stderr
+                )
             continue
 
         if line.startswith("/edit "):
@@ -288,7 +298,9 @@ async def run_terminal(
             except Forbidden:
                 print("Error: Forbidden to edit this message.", file=sys.stderr)
             except HTTPException as exc:
-                print(f"Error: HTTP error while editing message: {exc}", file=sys.stderr)
+                print(
+                    f"Error: HTTP error while editing message: {exc}", file=sys.stderr
+                )
             continue
 
         if line.startswith("/delete "):
@@ -314,7 +326,9 @@ async def run_terminal(
             except Forbidden:
                 print("Error: Forbidden to delete this message.", file=sys.stderr)
             except HTTPException as exc:
-                print(f"Error: HTTP error while deleting message: {exc}", file=sys.stderr)
+                print(
+                    f"Error: HTTP error while deleting message: {exc}", file=sys.stderr
+                )
             continue
 
         print("Unknown command. Use /help.", file=sys.stderr)
