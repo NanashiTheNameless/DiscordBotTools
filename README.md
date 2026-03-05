@@ -21,8 +21,11 @@ python3.14 -m pip install --upgrade git+https://github.com/NanashiTheNameless/di
 Common behavior across scripts:
 
 - If `--token` is omitted, the script prompts for the bot token.
+  In interactive POSIX terminals, input is shown as `*` characters.
+  In fallback/non-interactive modes, input is hidden by `getpass` without `*` echo.
 - If a required ID flag is omitted (`--user-id` / `--guild-id`), the script prompts for it.
 - IDs must be numeric Discord snowflakes.
+- Prompted input supports left/right cursor movement for inline editing when terminal/readline support is available.
 
 ### `Delete_Bot_DMs_With_User.py`
 

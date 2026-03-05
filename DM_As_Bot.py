@@ -5,6 +5,7 @@
 import argparse
 import asyncio
 import getpass
+import os
 import sys
 import threading
 from types import ModuleType
@@ -23,6 +24,105 @@ try:
     readline = _readline
 except ImportError:
     readline = None
+
+
+def configure_line_editing() -> None:
+    if readline is None:
+        return
+    try:
+        readline.parse_and_bind("set editing-mode emacs")
+        readline.parse_and_bind('"\\e[D": backward-char')
+        readline.parse_and_bind('"\\e[C": forward-char')
+        readline.parse_and_bind('"\\e[3~": delete-char')
+    except Exception:
+        return
+
+
+def prompt_line(prompt: str) -> str:
+    configure_line_editing()
+    return input(prompt)
+
+
+def prompt_token_with_mask(prompt: str = "Bot token: ") -> str:
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return getpass.getpass(prompt)
+
+    try:
+        import termios
+        import tty
+    except ImportError:
+        return getpass.getpass(prompt)
+
+    fd = sys.stdin.fileno()
+    original_settings = termios.tcgetattr(fd)
+    chars: list[str] = []
+    cursor = 0
+
+    def render() -> None:
+        masked = "*" * len(chars)
+        sys.stdout.write("\r" + prompt + masked + "\x1b[K")
+        move_left = len(chars) - cursor
+        if move_left > 0:
+            sys.stdout.write(f"\x1b[{move_left}D")
+        sys.stdout.flush()
+
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    try:
+        tty.setcbreak(fd)
+        while True:
+            raw = os.read(fd, 1)
+            if not raw:
+                raise EOFError
+            char = raw.decode(errors="ignore")
+
+            if char in ("\r", "\n"):
+                # Drain any trailing CR/LF so the next prompt does not auto-submit.
+                try:
+                    termios.tcflush(fd, termios.TCIFLUSH)
+                except Exception:
+                    pass
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
+                return "".join(chars)
+            if char == "\x03":
+                raise KeyboardInterrupt
+            if char == "\x04":
+                raise EOFError
+            if char in ("\x7f", "\b"):
+                if cursor > 0:
+                    del chars[cursor - 1]
+                    cursor -= 1
+                    render()
+                continue
+            if char == "\x1b":
+                seq1 = os.read(fd, 1)
+                if seq1 != b"[":
+                    continue
+                seq2 = os.read(fd, 1)
+                if seq2 == b"D":
+                    if cursor > 0:
+                        cursor -= 1
+                        render()
+                    continue
+                if seq2 == b"C":
+                    if cursor < len(chars):
+                        cursor += 1
+                        render()
+                    continue
+                if seq2 == b"3":
+                    seq3 = os.read(fd, 1)
+                    if seq3 == b"~" and cursor < len(chars):
+                        del chars[cursor]
+                        render()
+                    continue
+                continue
+            if char.isprintable():
+                chars.insert(cursor, char)
+                cursor += 1
+                render()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, original_settings)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -44,7 +144,7 @@ def prompt_for_user_id(initial_value: int | None) -> int | None:
     user_id = initial_value
     while user_id is None:
         try:
-            raw = input("Target user ID: ").strip()
+            raw = prompt_line("Target user ID: ").strip()
         except EOFError:
             return None
         if not raw:
@@ -86,17 +186,6 @@ def print_help() -> None:
     print("Tip: entering plain text (without a leading /) sends that text.")
 
 
-def configure_line_editing() -> None:
-    if readline is None:
-        return
-    try:
-        readline.parse_and_bind("set editing-mode emacs")
-        readline.parse_and_bind('"\\e[D": backward-char')
-        readline.parse_and_bind('"\\e[C": forward-char')
-    except Exception:
-        return
-
-
 async def read_input(prompt: str) -> str:
     loop = asyncio.get_running_loop()
     result: asyncio.Future[str] = loop.create_future()
@@ -111,7 +200,7 @@ async def read_input(prompt: str) -> str:
 
     def worker() -> None:
         try:
-            value = input(prompt)
+            value = prompt_line(prompt)
         except BaseException as exc:
             try:
                 loop.call_soon_threadsafe(reject, exc)
@@ -370,7 +459,7 @@ async def main() -> int:
     token = args.token
     if not token:
         try:
-            token = getpass.getpass("Bot token: ")
+            token = prompt_token_with_mask("Bot token: ")
         except (EOFError, KeyboardInterrupt):
             print()
             print("Exiting.")
