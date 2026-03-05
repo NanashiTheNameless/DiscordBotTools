@@ -32,7 +32,7 @@ Example:
 python3.14 Delete_Bot_DMs_With_User.py --user-id 123456789012345678
 ```
 
-### `_Bot.py`
+### `DM_As_Bot.py`
 
 Interactive DM terminal as the bot for one user.
 
