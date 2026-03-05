@@ -81,7 +81,7 @@ def print_help() -> None:
     print("  /delete <message_id>       Delete one of the bot's messages")
     print("  /edit-last <text>          Edit the last bot message")
     print("  /delete-last               Delete the last bot message")
-    print("  /quit                      Exit")
+    print("  /quit, /exit               Exit")
     print("Tip: entering plain text (without a leading /) sends that text.")
 
 
@@ -161,7 +161,7 @@ async def run_terminal(
         print(f"Last bot message ID: {last_bot_message_id}")
     else:
         print("Last bot message ID: none")
-    print("Enter /help for commands, /quit to exit.")
+    print("Enter /help for commands, /quit or /exit to exit.")
     configure_line_editing()
 
     while True:

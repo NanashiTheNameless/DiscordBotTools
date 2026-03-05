@@ -49,7 +49,8 @@ Commands inside the terminal:
 - `/delete <message_id>` delete one of the bot's messages
 - `/edit-last <text>` edit the most recent bot message
 - `/delete-last` delete the most recent bot message
-- `/help`, `/quit`
+- `/quit`, `/exit` exit the terminal
+- `/help` show command help
 
 Example:
 
