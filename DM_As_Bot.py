@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import getpass
 import sys
+import threading
 from types import ModuleType
 
 import discord  # pyright: ignore[reportMissingImports]
@@ -96,6 +97,36 @@ def configure_line_editing() -> None:
         return
 
 
+async def read_input(prompt: str) -> str:
+    loop = asyncio.get_running_loop()
+    result: asyncio.Future[str] = loop.create_future()
+
+    def resolve(value: str) -> None:
+        if not result.done():
+            result.set_result(value)
+
+    def reject(exc: BaseException) -> None:
+        if not result.done():
+            result.set_exception(exc)
+
+    def worker() -> None:
+        try:
+            value = input(prompt)
+        except BaseException as exc:
+            try:
+                loop.call_soon_threadsafe(reject, exc)
+            except RuntimeError:
+                return
+            return
+        try:
+            loop.call_soon_threadsafe(resolve, value)
+        except RuntimeError:
+            return
+
+    threading.Thread(target=worker, daemon=True).start()
+    return await result
+
+
 async def show_history(
     dm_channel: discord.DMChannel, bot_user_id: int, limit: int
 ) -> None:
@@ -166,7 +197,7 @@ async def run_terminal(
 
     while True:
         try:
-            raw = await asyncio.to_thread(input, "dm> ")
+            raw = await read_input("dm> ")
         except asyncio.CancelledError:
             print()
             print("Exiting.")
@@ -364,7 +395,7 @@ async def main() -> int:
     @client.event
     async def on_ready():
         nonlocal active_dm_channel_id
-        print(f"Logged in as {client.user} (id: {client.user.id})")
+        print(f"Logged in as {client.user} (id: {client.user.id})") # type: ignore
         try:
             try:
                 user = await client.fetch_user(user_id)
@@ -394,7 +425,7 @@ async def main() -> int:
 
             active_dm_channel_id = dm_channel.id
             print(f"Connected to DM with {user} (channel id: {dm_channel.id})")
-            ok = await run_terminal(dm_channel, client.user.id, args.history)
+            ok = await run_terminal(dm_channel, client.user.id, args.history) # type: ignore
             active_dm_channel_id = None
             done.set_result(ok)
         except Exception as exc:
