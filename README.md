@@ -20,7 +20,7 @@ python3.14 -m pip install --upgrade git+https://github.com/NanashiTheNameless/di
 
 ### `Delete_Bot_DMs_With_User.py`
 
-Delete this bot's messages in a DM channel with a specific user.
+Delete the bot's messages in a DM channel with a specific user.
 
 - `--token` (prompts if omitted)
 - `--user-id` (prompts if omitted)
