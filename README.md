@@ -54,7 +54,7 @@ Commands inside the terminal:
 Example:
 
 ```bash
-python3.14 _Bot.py --user-id 123456789012345678
+python3.14 DM_As_Bot.py --user-id 123456789012345678
 ```
 
 ### `Get_Guild_Owner.py`
