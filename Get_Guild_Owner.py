@@ -133,7 +133,7 @@ async def main() -> int:
         print(f"Owner ID: {result['owner_id']}")
         if result["owner_user"] is not None:
             print(
-                f"Owner Username: {result['owner_user']} (id={result['owner_user'].id})"
+                f"Owner Username: {result['owner_user']} ({result['owner_user'].id})"
             )
 
     return 0
