@@ -13,7 +13,7 @@ Small standalone scripts for managing Discord bots and guilds.
 ```bash
 git clone https://github.com/NanashiTheNameless/DiscordBotTools
 cd DiscordBotTools
-pip install git+https://github.com/NanashiTheNameless/discord.py
+python3.14 -m pip install --upgrade git+https://github.com/NanashiTheNameless/discord.py
 ```
 
 ## Available Scripts
