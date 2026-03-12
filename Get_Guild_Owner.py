@@ -7,6 +7,8 @@ import asyncio
 import getpass
 import os
 import sys
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 import discord  # pyright: ignore[reportMissingImports]
 from discord.errors import (  # pyright: ignore[reportMissingImports]
@@ -22,6 +24,71 @@ try:
     readline = _readline
 except ImportError:
     readline = None
+
+T = TypeVar("T")
+RETRIABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
+TRANSIENT_HTTP_MARKERS = (
+    "service unavailable",
+    "upstream connect error",
+    "disconnect/reset before headers",
+    "reset reason: overflow",
+    "server error",
+    "bad gateway",
+    "gateway timeout",
+    "temporarily unavailable",
+)
+
+
+def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
+    def verbose(message: str) -> None:
+        if enabled:
+            print(f"[verbose] {message}", file=sys.stderr)
+
+    return verbose
+
+
+def is_retriable_http_exception(exc: HTTPException) -> bool:
+    status = getattr(exc, "status", None)
+    if status in RETRIABLE_HTTP_STATUSES:
+        return True
+
+    message = str(exc).lower()
+    return any(marker in message for marker in TRANSIENT_HTTP_MARKERS)
+
+
+async def retry_http_request(
+    label: str,
+    operation: Callable[[], Awaitable[T]],
+    *,
+    attempts: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 8.0,
+    verbose: Callable[[str], None] | None = None,
+) -> T:
+    last_exc: HTTPException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            result = await operation()
+            if attempt > 1 and verbose is not None:
+                verbose(f"{label} succeeded on attempt {attempt}/{attempts}.")
+            return result
+        except HTTPException as exc:
+            last_exc = exc
+            if attempt >= attempts or not is_retriable_http_exception(exc):
+                raise
+
+            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            status = getattr(exc, "status", "?")
+            print(
+                f"Warning: {label} failed with HTTP {status} on attempt "
+                f"{attempt}/{attempts}; retrying in {delay:.1f}s.",
+                file=sys.stderr,
+            )
+            await asyncio.sleep(delay)
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"retry_http_request exhausted attempts for {label}")
 
 
 def configure_line_editing() -> None:
@@ -131,11 +198,17 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument(
         "--guild-id", type=int, help="Target guild (server) ID (prompts if omitted)."
     )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print extra progress and retry information to stderr.",
+    )
     return p
 
 
 async def main() -> int:
     args = build_argparser().parse_args()
+    verbose = build_verbose_printer(args.verbose)
     token = args.token
     if not token:
         try:
@@ -177,10 +250,16 @@ async def main() -> int:
     @client.event
     async def on_ready():
         try:
+            verbose(f"Logged in as {client.user} (id: {client.user.id})")
             guild = client.get_guild(guild_id)
             if guild is None:
                 try:
-                    guild = await client.fetch_guild(guild_id)
+                    verbose(f"Fetching guild {guild_id} from the API.")
+                    guild = await retry_http_request(
+                        "fetching guild",
+                        lambda: client.fetch_guild(guild_id),
+                        verbose=verbose,
+                    )
                 except NotFound:
                     print(f"Error: Guild {guild_id} not found.", file=sys.stderr)
                     done.set_result(False)
@@ -199,12 +278,19 @@ async def main() -> int:
                     )
                     done.set_result(False)
                     return
+            else:
+                verbose(f"Using cached guild {guild.name} ({guild.id}).")
 
             owner_id = getattr(guild, "owner_id", None)
             owner_user = None
             if owner_id is not None:
                 try:
-                    owner_user = await client.fetch_user(owner_id)
+                    verbose(f"Fetching owner user {owner_id}.")
+                    owner_user = await retry_http_request(
+                        "fetching owner user",
+                        lambda: client.fetch_user(owner_id),
+                        verbose=verbose,
+                    )
                 except (NotFound, HTTPException):
                     owner_user = None
 

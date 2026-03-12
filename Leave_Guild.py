@@ -7,11 +7,14 @@ import asyncio
 import getpass
 import os
 import sys
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 import discord  # pyright: ignore[reportMissingImports]
 from discord.errors import (  # pyright: ignore[reportMissingImports]
     Forbidden,
     HTTPException,
+    NotFound,
 )
 
 readline = None
@@ -21,6 +24,71 @@ try:
     readline = _readline
 except ImportError:
     readline = None
+
+T = TypeVar("T")
+RETRIABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
+TRANSIENT_HTTP_MARKERS = (
+    "service unavailable",
+    "upstream connect error",
+    "disconnect/reset before headers",
+    "reset reason: overflow",
+    "server error",
+    "bad gateway",
+    "gateway timeout",
+    "temporarily unavailable",
+)
+
+
+def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
+    def verbose(message: str) -> None:
+        if enabled:
+            print(f"[verbose] {message}", file=sys.stderr)
+
+    return verbose
+
+
+def is_retriable_http_exception(exc: HTTPException) -> bool:
+    status = getattr(exc, "status", None)
+    if status in RETRIABLE_HTTP_STATUSES:
+        return True
+
+    message = str(exc).lower()
+    return any(marker in message for marker in TRANSIENT_HTTP_MARKERS)
+
+
+async def retry_http_request(
+    label: str,
+    operation: Callable[[], Awaitable[T]],
+    *,
+    attempts: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 8.0,
+    verbose: Callable[[str], None] | None = None,
+) -> T:
+    last_exc: HTTPException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            result = await operation()
+            if attempt > 1 and verbose is not None:
+                verbose(f"{label} succeeded on attempt {attempt}/{attempts}.")
+            return result
+        except HTTPException as exc:
+            last_exc = exc
+            if attempt >= attempts or not is_retriable_http_exception(exc):
+                raise
+
+            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            status = getattr(exc, "status", "?")
+            print(
+                f"Warning: {label} failed with HTTP {status} on attempt "
+                f"{attempt}/{attempts}; retrying in {delay:.1f}s.",
+                file=sys.stderr,
+            )
+            await asyncio.sleep(delay)
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"retry_http_request exhausted attempts for {label}")
 
 
 def configure_line_editing() -> None:
@@ -128,11 +196,17 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument(
         "--guild-id", type=int, help="Target guild (server) ID (prompts if omitted)."
     )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print extra progress and retry information to stderr.",
+    )
     return p
 
 
 async def main() -> int:
     args = build_argparser().parse_args()
+    verbose = build_verbose_printer(args.verbose)
     token = args.token
     if not token:
         try:
@@ -160,6 +234,7 @@ async def main() -> int:
             continue
 
     intents = discord.Intents.none()
+    intents.guilds = True
 
     client = discord.Client(intents=intents)
     done = asyncio.get_running_loop().create_future()
@@ -170,10 +245,23 @@ async def main() -> int:
             try:
                 guild = client.get_guild(guild_id)
                 if guild is None:
-                    print(f"Error: Guild {guild_id} not found.", file=sys.stderr)
-                    done.set_result(False)
-                    return
-            except Exception as exc:
+                    verbose(f"Guild {guild_id} not in cache; fetching from the API.")
+                    guild = await retry_http_request(
+                        "fetching guild",
+                        lambda: client.fetch_guild(guild_id),
+                        verbose=verbose,
+                    )
+                else:
+                    verbose(f"Using cached guild {guild.name} ({guild.id}).")
+            except NotFound:
+                print(f"Error: Guild {guild_id} not found.", file=sys.stderr)
+                done.set_result(False)
+                return
+            except Forbidden:
+                print("Error: Bot cannot access that guild.", file=sys.stderr)
+                done.set_result(False)
+                return
+            except HTTPException as exc:
                 print(f"Error: Could not fetch guild: {exc}", file=sys.stderr)
                 done.set_result(False)
                 return
@@ -182,7 +270,16 @@ async def main() -> int:
             print(f"Leaving guild: {guild.name} (id: {guild.id})")
 
             try:
-                await guild.leave()
+                verbose(f"Sending leave request for guild {guild.id}.")
+                await retry_http_request(
+                    "leaving guild",
+                    guild.leave,
+                    attempts=4,
+                    verbose=verbose,
+                )
+                print(f"Successfully left {guild.name}.")
+                done.set_result(True)
+            except NotFound:
                 print(f"Successfully left {guild.name}.")
                 done.set_result(True)
             except Forbidden:

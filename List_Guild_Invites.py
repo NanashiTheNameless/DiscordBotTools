@@ -8,7 +8,9 @@ import getpass
 import json
 import os
 import sys
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
+from typing import TypeVar
 
 import discord  # pyright: ignore[reportMissingImports]
 from discord.errors import (  # pyright: ignore[reportMissingImports]
@@ -24,6 +26,71 @@ try:
     readline = _readline
 except ImportError:
     readline = None
+
+T = TypeVar("T")
+RETRIABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
+TRANSIENT_HTTP_MARKERS = (
+    "service unavailable",
+    "upstream connect error",
+    "disconnect/reset before headers",
+    "reset reason: overflow",
+    "server error",
+    "bad gateway",
+    "gateway timeout",
+    "temporarily unavailable",
+)
+
+
+def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
+    def verbose(message: str) -> None:
+        if enabled:
+            print(f"[verbose] {message}", file=sys.stderr)
+
+    return verbose
+
+
+def is_retriable_http_exception(exc: HTTPException) -> bool:
+    status = getattr(exc, "status", None)
+    if status in RETRIABLE_HTTP_STATUSES:
+        return True
+
+    message = str(exc).lower()
+    return any(marker in message for marker in TRANSIENT_HTTP_MARKERS)
+
+
+async def retry_http_request(
+    label: str,
+    operation: Callable[[], Awaitable[T]],
+    *,
+    attempts: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 8.0,
+    verbose: Callable[[str], None] | None = None,
+) -> T:
+    last_exc: HTTPException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            result = await operation()
+            if attempt > 1 and verbose is not None:
+                verbose(f"{label} succeeded on attempt {attempt}/{attempts}.")
+            return result
+        except HTTPException as exc:
+            last_exc = exc
+            if attempt >= attempts or not is_retriable_http_exception(exc):
+                raise
+
+            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            status = getattr(exc, "status", "?")
+            print(
+                f"Warning: {label} failed with HTTP {status} on attempt "
+                f"{attempt}/{attempts}; retrying in {delay:.1f}s.",
+                file=sys.stderr,
+            )
+            await asyncio.sleep(delay)
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"retry_http_request exhausted attempts for {label}")
 
 
 def configure_line_editing() -> None:
@@ -182,6 +249,11 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument(
         "--reason", default=None, help="Audit log reason for creating the invite."
     )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print extra progress and retry information to stderr.",
+    )
     return p
 
 
@@ -215,22 +287,32 @@ def invite_record(inv: discord.Invite) -> dict:
 
 
 async def choose_channel_for_invite(
-    guild: discord.Guild, preferred_id: int | None
+    guild: discord.Guild,
+    preferred_id: int | None,
+    verbose: Callable[[str], None],
 ) -> discord.abc.GuildChannel | None:
     if preferred_id:
         try:
-            ch = guild.get_channel(preferred_id) or await guild.fetch_channel(
-                preferred_id
-            )
+            ch = guild.get_channel(preferred_id)
+            if ch is None:
+                verbose(f"Fetching preferred invite channel {preferred_id}.")
+                ch = await retry_http_request(
+                    "fetching preferred invite channel",
+                    lambda: guild.fetch_channel(preferred_id),
+                    verbose=verbose,
+                )
             return ch
         except (NotFound, Forbidden, HTTPException):
             return None
     if guild.system_channel:
+        verbose(f"Using system channel {guild.system_channel.id} for invite creation.")
         return guild.system_channel
     for ch in sorted(guild.text_channels, key=lambda c: (c.position, c.id)):
+        verbose(f"Using text channel {ch.id} for invite creation.")
         return ch
     for ch in guild.channels:
         if hasattr(ch, "create_invite"):
+            verbose(f"Using fallback channel {getattr(ch, 'id', 'unknown')} for invite creation.")
             return ch
     return None
 
@@ -251,6 +333,7 @@ def prompt_for_int(prompt_text: str) -> int | None:
 
 async def main() -> int:
     args = build_argparser().parse_args()
+    verbose = build_verbose_printer(args.verbose)
     token = args.token
     if not token:
         try:
@@ -279,12 +362,20 @@ async def main() -> int:
     @client.event
     async def on_ready():
         try:
+            verbose(f"Logged in as {client.user} (id: {client.user.id})")
             guild = client.get_guild(guild_id)
             if guild is None:
                 try:
-                    guild = await client.fetch_guild(guild_id)
+                    verbose(f"Fetching guild {guild_id} from the API.")
+                    guild = await retry_http_request(
+                        "fetching guild",
+                        lambda: client.fetch_guild(guild_id),
+                        verbose=verbose,
+                    )
                 except HTTPException:
                     guild = None
+            else:
+                verbose(f"Using cached guild {guild.name} ({guild.id}).")
 
             if guild is None:
                 print(
@@ -296,16 +387,23 @@ async def main() -> int:
 
             invites = []
             try:
-                invites = await guild.invites()
+                verbose(f"Fetching invites for guild {guild.id}.")
+                invites = await retry_http_request(
+                    "fetching guild invites",
+                    guild.invites,
+                    verbose=verbose,
+                )
             except Forbidden:
                 invites = []
             except HTTPException as e:
                 print(f"Error: HTTP error when fetching invites: {e}", file=sys.stderr)
+            else:
+                verbose(f"Fetched {len(invites)} invite(s).")
 
             should_create = args.create and (not args.only_if_none or len(invites) == 0)
             created_rec = None
             if should_create:
-                channel = await choose_channel_for_invite(guild, args.channel_id)
+                channel = await choose_channel_for_invite(guild, args.channel_id, verbose)
                 if channel is None:
                     print(
                         "Error: Could not resolve a channel to create an invite in.",
@@ -313,6 +411,7 @@ async def main() -> int:
                     )
                 else:
                     try:
+                        verbose(f"Creating invite in channel {channel.id}.")
                         new_inv = await channel.create_invite(
                             max_age=args.max_age,
                             max_uses=args.max_uses,

@@ -6,9 +6,13 @@ import argparse
 import asyncio
 import getpass
 import os
+import shutil
 import sys
 import threading
+import textwrap
+from collections.abc import Awaitable, Callable
 from types import ModuleType
+from typing import TypeVar
 
 import discord  # pyright: ignore[reportMissingImports]
 from discord.errors import (  # pyright: ignore[reportMissingImports]
@@ -24,6 +28,71 @@ try:
     readline = _readline
 except ImportError:
     readline = None
+
+T = TypeVar("T")
+RETRIABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
+TRANSIENT_HTTP_MARKERS = (
+    "service unavailable",
+    "upstream connect error",
+    "disconnect/reset before headers",
+    "reset reason: overflow",
+    "server error",
+    "bad gateway",
+    "gateway timeout",
+    "temporarily unavailable",
+)
+
+
+def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
+    def verbose(message: str) -> None:
+        if enabled:
+            print(f"[verbose] {message}", file=sys.stderr)
+
+    return verbose
+
+
+def is_retriable_http_exception(exc: HTTPException) -> bool:
+    status = getattr(exc, "status", None)
+    if status in RETRIABLE_HTTP_STATUSES:
+        return True
+
+    message = str(exc).lower()
+    return any(marker in message for marker in TRANSIENT_HTTP_MARKERS)
+
+
+async def retry_http_request(
+    label: str,
+    operation: Callable[[], Awaitable[T]],
+    *,
+    attempts: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 8.0,
+    verbose: Callable[[str], None] | None = None,
+) -> T:
+    last_exc: HTTPException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            result = await operation()
+            if attempt > 1 and verbose is not None:
+                verbose(f"{label} succeeded on attempt {attempt}/{attempts}.")
+            return result
+        except HTTPException as exc:
+            last_exc = exc
+            if attempt >= attempts or not is_retriable_http_exception(exc):
+                raise
+
+            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            status = getattr(exc, "status", "?")
+            print(
+                f"Warning: {label} failed with HTTP {status} on attempt "
+                f"{attempt}/{attempts}; retrying in {delay:.1f}s.",
+                file=sys.stderr,
+            )
+            await asyncio.sleep(delay)
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"retry_http_request exhausted attempts for {label}")
 
 
 def configure_line_editing() -> None:
@@ -137,6 +206,11 @@ def build_argparser() -> argparse.ArgumentParser:
         default=10,
         help="Show this many recent messages on connect and for /list default. Default: 10",
     )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print extra progress and retry information to stderr.",
+    )
     return p
 
 
@@ -157,20 +231,102 @@ def prompt_for_user_id(initial_value: int | None) -> int | None:
 
 
 def normalize_content(content: str) -> str:
-    text = content.replace("\n", "\\n")
-    if len(text) > 180:
-        return text[:177] + "..."
-    return text
+    return content.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def format_message_line(message: discord.Message, bot_user_id: int) -> str:
+def decode_typed_escapes(text: str) -> str:
+    decoded: list[str] = []
+    index = 0
+    replacements = {
+        "\\": "\\",
+        "n": "\n",
+        "t": "\t",
+    }
+
+    while index < len(text):
+        char = text[index]
+        if char != "\\" or index + 1 >= len(text):
+            decoded.append(char)
+            index += 1
+            continue
+
+        escaped = replacements.get(text[index + 1])
+        if escaped is None:
+            decoded.append(char)
+            index += 1
+            continue
+
+        decoded.append(escaped)
+        index += 2
+
+    return "".join(decoded)
+
+
+def get_terminal_columns() -> int:
+    return max(60, shutil.get_terminal_size(fallback=(100, 24)).columns)
+
+
+def expand_tabs_for_display(
+    text: str, *, start_column: int, tabsize: int = 8
+) -> str:
+    expanded: list[str] = []
+    column = start_column
+    for char in text:
+        if char == "\t":
+            spaces = tabsize - (column % tabsize)
+            expanded.append(" " * spaces)
+            column += spaces
+            continue
+        expanded.append(char)
+        column += 1
+    return "".join(expanded)
+
+
+def format_text_block(header: str, content: str) -> list[str]:
+    content_width = max(20, get_terminal_columns() - len(header))
+    continuation = " " * len(header)
+    rendered: list[str] = []
+
+    for logical_line in normalize_content(content).split("\n"):
+        expanded_line = expand_tabs_for_display(logical_line, start_column=len(header))
+        wrapped = textwrap.wrap(
+            expanded_line,
+            width=content_width,
+            replace_whitespace=False,
+            drop_whitespace=False,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        if not wrapped:
+            wrapped = [""]
+
+        for chunk in wrapped:
+            line_prefix = header if not rendered else continuation
+            rendered.append(line_prefix + chunk)
+
+    return rendered or [header]
+
+
+def format_message_lines(
+    message: discord.Message, bot_user_id: int, *, prefix: str = ""
+) -> list[str]:
     author = "bot" if message.author.id == bot_user_id else str(message.author)
+    content_parts: list[str] = []
     content = normalize_content(message.content or "")
-    if not content and message.attachments:
-        content = f"[{len(message.attachments)} attachment(s)]"
+    if content:
+        content_parts.append(content)
+    if message.attachments:
+        content_parts.append(f"[{len(message.attachments)} attachment(s)]")
+        for index, attachment in enumerate(message.attachments, start=1):
+            filename = attachment.filename or f"attachment-{index}"
+            filename = filename.replace("\r", " ").replace("\n", " ")
+            content_parts.append(f"{filename}: {attachment.url}")
+    content = "\n".join(content_parts)
     if not content:
         content = "[empty]"
-    return f"{message.id}  {author}: {content}"
+
+    header = f"{prefix}{message.id}  {author}: "
+    return format_text_block(header, content)
 
 
 def print_help() -> None:
@@ -184,6 +340,7 @@ def print_help() -> None:
     print("  /delete-last               Delete the last bot message")
     print("  /quit, /exit               Exit")
     print("Tip: entering plain text (without a leading /) sends that text.")
+    print("Tip: use \\n, \\t, and \\\\ in sends and edits for escapes.")
 
 
 async def read_input(prompt: str) -> str:
@@ -217,12 +374,23 @@ async def read_input(prompt: str) -> str:
 
 
 async def show_history(
-    dm_channel: discord.DMChannel, bot_user_id: int, limit: int
+    dm_channel: discord.DMChannel,
+    bot_user_id: int,
+    limit: int,
+    verbose: Callable[[str], None],
 ) -> None:
     count = max(1, min(limit, 100))
+
+    async def load_messages() -> list[discord.Message]:
+        return [message async for message in dm_channel.history(limit=count)]
+
     try:
         # Fetch latest messages, then print oldest->newest within that window.
-        messages = [message async for message in dm_channel.history(limit=count)]
+        messages = await retry_http_request(
+            "reading DM history",
+            load_messages,
+            verbose=verbose,
+        )
         messages.reverse()
     except HTTPException as exc:
         print(f"Error: HTTP error while reading history: {exc}", file=sys.stderr)
@@ -233,26 +401,43 @@ async def show_history(
         return
 
     for message in messages:
-        print(format_message_line(message, bot_user_id))
+        for line in format_message_lines(message, bot_user_id):
+            print(line)
 
 
 async def find_last_bot_message_id(
-    dm_channel: discord.DMChannel, bot_user_id: int
+    dm_channel: discord.DMChannel,
+    bot_user_id: int,
+    verbose: Callable[[str], None],
 ) -> int | None:
-    try:
+    async def find_message() -> int | None:
         async for message in dm_channel.history(limit=100):
             if message.author.id == bot_user_id:
                 return message.id
+        return None
+
+    try:
+        return await retry_http_request(
+            "finding last bot DM message",
+            find_message,
+            verbose=verbose,
+        )
     except HTTPException:
         return None
-    return None
 
 
 async def fetch_owned_message(
-    dm_channel: discord.DMChannel, message_id: int, bot_user_id: int
+    dm_channel: discord.DMChannel,
+    message_id: int,
+    bot_user_id: int,
+    verbose: Callable[[str], None],
 ) -> discord.Message | None:
     try:
-        message = await dm_channel.fetch_message(message_id)
+        message = await retry_http_request(
+            f"fetching message {message_id}",
+            lambda: dm_channel.fetch_message(message_id),
+            verbose=verbose,
+        )
     except NotFound:
         print(f"Error: Message {message_id} not found.", file=sys.stderr)
         return None
@@ -267,16 +452,21 @@ async def fetch_owned_message(
 
 
 async def run_terminal(
-    dm_channel: discord.DMChannel, bot_user_id: int, default_history: int
+    dm_channel: discord.DMChannel,
+    bot_user_id: int,
+    default_history: int,
+    verbose: Callable[[str], None],
 ) -> bool:
     history_count = max(1, min(default_history, 100))
     print_help()
     print()
     print(f"Recent messages (last {history_count}):")
-    await show_history(dm_channel, bot_user_id, history_count)
+    await show_history(dm_channel, bot_user_id, history_count, verbose)
     print()
 
-    last_bot_message_id = await find_last_bot_message_id(dm_channel, bot_user_id)
+    last_bot_message_id = await find_last_bot_message_id(
+        dm_channel, bot_user_id, verbose
+    )
     if last_bot_message_id is not None:
         print(f"Last bot message ID: {last_bot_message_id}")
     else:
@@ -305,6 +495,7 @@ async def run_terminal(
             if not content:
                 print("Error: Message content cannot be empty.", file=sys.stderr)
                 return
+            content = decode_typed_escapes(content)
             try:
                 message = await dm_channel.send(content)
             except Forbidden:
@@ -316,10 +507,9 @@ async def run_terminal(
                 )
                 return
             last_bot_message_id = message.id
-            sent_text = normalize_content(message.content or "")
-            if not sent_text:
-                sent_text = "[empty]"
-            print(f"Sent message {message.id}: {sent_text}")
+            sent_text = message.content or "[empty]"
+            for line in format_text_block(f"Sent message {message.id}: ", sent_text):
+                print(line)
 
         if not line.startswith("/"):
             await send_message(line)
@@ -344,7 +534,7 @@ async def run_terminal(
                 except ValueError:
                     print("Error: /list count must be an integer.", file=sys.stderr)
                     continue
-            await show_history(dm_channel, bot_user_id, requested)
+            await show_history(dm_channel, bot_user_id, requested, verbose)
             continue
 
         if line.startswith("/edit-last "):
@@ -355,13 +545,18 @@ async def run_terminal(
             if not new_content:
                 print("Error: New message content cannot be empty.", file=sys.stderr)
                 continue
+            new_content = decode_typed_escapes(new_content)
             message = await fetch_owned_message(
-                dm_channel, last_bot_message_id, bot_user_id
+                dm_channel, last_bot_message_id, bot_user_id, verbose
             )
             if message is None:
                 continue
             try:
-                await message.edit(content=new_content)
+                await retry_http_request(
+                    f"editing message {message.id}",
+                    lambda: message.edit(content=new_content),
+                    verbose=verbose,
+                )
                 print(f"Edited message {message.id}")
             except Forbidden:
                 print("Error: Forbidden to edit this message.", file=sys.stderr)
@@ -376,15 +571,25 @@ async def run_terminal(
                 print("Error: No previous bot message to delete.", file=sys.stderr)
                 continue
             message = await fetch_owned_message(
-                dm_channel, last_bot_message_id, bot_user_id
+                dm_channel, last_bot_message_id, bot_user_id, verbose
             )
             if message is None:
                 continue
             try:
-                await message.delete()
+                await retry_http_request(
+                    f"deleting message {message.id}",
+                    message.delete,
+                    attempts=4,
+                    verbose=verbose,
+                )
                 print(f"Deleted message {message.id}")
                 last_bot_message_id = await find_last_bot_message_id(
-                    dm_channel, bot_user_id
+                    dm_channel, bot_user_id, verbose
+                )
+            except NotFound:
+                print(f"Deleted message {message.id}")
+                last_bot_message_id = await find_last_bot_message_id(
+                    dm_channel, bot_user_id, verbose
                 )
             except Forbidden:
                 print("Error: Forbidden to delete this message.", file=sys.stderr)
@@ -408,11 +613,18 @@ async def run_terminal(
             if not new_content:
                 print("Error: New message content cannot be empty.", file=sys.stderr)
                 continue
-            message = await fetch_owned_message(dm_channel, message_id, bot_user_id)
+            new_content = decode_typed_escapes(new_content)
+            message = await fetch_owned_message(
+                dm_channel, message_id, bot_user_id, verbose
+            )
             if message is None:
                 continue
             try:
-                edited = await message.edit(content=new_content)
+                edited = await retry_http_request(
+                    f"editing message {message.id}",
+                    lambda: message.edit(content=new_content),
+                    verbose=verbose,
+                )
                 last_bot_message_id = edited.id
                 print(f"Edited message {edited.id}")
             except Forbidden:
@@ -433,15 +645,28 @@ async def run_terminal(
             except ValueError:
                 print("Error: message_id must be an integer.", file=sys.stderr)
                 continue
-            message = await fetch_owned_message(dm_channel, message_id, bot_user_id)
+            message = await fetch_owned_message(
+                dm_channel, message_id, bot_user_id, verbose
+            )
             if message is None:
                 continue
             try:
-                await message.delete()
+                await retry_http_request(
+                    f"deleting message {message.id}",
+                    message.delete,
+                    attempts=4,
+                    verbose=verbose,
+                )
                 print(f"Deleted message {message.id}")
                 if last_bot_message_id == message.id:
                     last_bot_message_id = await find_last_bot_message_id(
-                        dm_channel, bot_user_id
+                        dm_channel, bot_user_id, verbose
+                    )
+            except NotFound:
+                print(f"Deleted message {message.id}")
+                if last_bot_message_id == message.id:
+                    last_bot_message_id = await find_last_bot_message_id(
+                        dm_channel, bot_user_id, verbose
                     )
             except Forbidden:
                 print("Error: Forbidden to delete this message.", file=sys.stderr)
@@ -456,6 +681,7 @@ async def run_terminal(
 
 async def main() -> int:
     args = build_argparser().parse_args()
+    verbose = build_verbose_printer(args.verbose)
     token = args.token
     if not token:
         try:
@@ -487,7 +713,12 @@ async def main() -> int:
         print(f"Logged in as {client.user} (id: {client.user.id})") # type: ignore
         try:
             try:
-                user = await client.fetch_user(user_id)
+                verbose(f"Fetching user {user_id}.")
+                user = await retry_http_request(
+                    "fetching target user",
+                    lambda: client.fetch_user(user_id),
+                    verbose=verbose,
+                )
             except NotFound:
                 print("Error: Target user not found.", file=sys.stderr)
                 done.set_result(False)
@@ -498,7 +729,12 @@ async def main() -> int:
                 return
 
             try:
-                dm_channel = await user.create_dm()
+                verbose(f"Resolving DM channel with user {user_id}.")
+                dm_channel = await retry_http_request(
+                    "creating or fetching DM channel",
+                    user.create_dm,
+                    verbose=verbose,
+                )
             except HTTPException as exc:
                 print(
                     f"Error: Could not create or fetch DM channel: {exc}",
@@ -514,7 +750,12 @@ async def main() -> int:
 
             active_dm_channel_id = dm_channel.id
             print(f"Connected to DM with {user} (channel id: {dm_channel.id})")
-            ok = await run_terminal(dm_channel, client.user.id, args.history) # type: ignore
+            ok = await run_terminal(
+                dm_channel,
+                client.user.id,  # type: ignore[arg-type]
+                args.history,
+                verbose,
+            )
             active_dm_channel_id = None
             done.set_result(ok)
         except Exception as exc:
@@ -531,7 +772,8 @@ async def main() -> int:
         if message.author.id == client.user.id:
             return
         print()
-        print(f"[NEW] {format_message_line(message, client.user.id)}")
+        for line in format_message_lines(message, client.user.id, prefix="[NEW] "):
+            print(line)
         line_buffer = ""
         if readline is not None:
             try:

@@ -26,6 +26,8 @@ Common behavior across scripts:
 - If a required ID flag is omitted (`--user-id` / `--guild-id`), the script prompts for it.
 - IDs must be numeric Discord snowflakes.
 - Prompted input supports left/right cursor movement for inline editing when terminal/readline support is available.
+- All scripts support `--verbose` for extra progress and retry information on `stderr`.
+- Transient Discord HTTP failures on safe fetch/read operations are retried automatically.
 
 ### `Delete_Bot_DMs_With_User.py`
 
@@ -36,17 +38,24 @@ Flags:
 - `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
 - `--user-id <user_id>`: Target user's ID. If omitted, prompts until valid numeric input.
 - `--sleep <seconds>`: Delay between deleting each bot-authored message in that DM.
-  Default is `0.3`. Use `0` to disable the extra delay.
+  Default is `0.0`.
+- `--scan-limit <count>`: Only inspect this many most recent DM messages.
+  Default is unlimited.
+- `--before-message-id <message_id>`: Only inspect messages before this Discord message ID.
+- `--after-message-id <message_id>`: Only inspect messages after this Discord message ID.
+- `--verbose`: Print extra progress and retry information to `stderr`.
 
 Notes:
 
 - Only messages sent by the bot are deleted.
-- Messages are processed oldest-to-newest.
+- Messages are processed newest-to-oldest.
+- Discord DM history still has to be paginated by Discord's API.
+  Use `--scan-limit`, `--before-message-id`, or `--after-message-id` to avoid crawling the entire conversation when you only need a slice.
 
 Example:
 
 ```bash
-python3.14 Delete_Bot_DMs_With_User.py --user-id 123456789012345678
+python3.14 Delete_Bot_DMs_With_User.py --user-id 123456789012345678 --scan-limit 5000 --verbose
 ```
 
 ### `DM_As_Bot.py`
@@ -60,10 +69,18 @@ Flags:
 - `--history <count>`: Number of recent DM messages shown on connect, and the default
   count used by `/list` with no argument. Default is `10`. Runtime display is clamped
   to `1-100`.
+- `--verbose`: Print extra progress and retry information to `stderr`.
 
 Behavior:
 
 - New incoming DM messages from the target user are printed live while the terminal is open.
+- Displayed messages wrap to the current terminal width.
+- Message display preserves newlines and expands tabs for terminal output.
+- Attachments are shown as:
+  `[N attachment(s)]`
+  followed by one `filename: url` line per attachment.
+- Typed escapes in sends and edits are decoded before sending:
+  `\n` for newline, `\t` for tab, `\\` for a literal backslash.
 
 Commands inside the terminal:
 
@@ -91,6 +108,7 @@ Flags:
 
 - `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
 - `--guild-id <guild_id>`: Guild ID to inspect. If omitted, prompts until valid numeric input.
+- `--verbose`: Print extra progress and retry information to `stderr`.
 
 Output:
 
@@ -111,6 +129,7 @@ Flags:
 
 - `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
 - `--guild-id <guild_id>`: Guild ID to leave. If omitted, prompts until valid numeric input.
+- `--verbose`: Print extra progress and retry information to `stderr`.
 
 Note:
 
@@ -132,6 +151,7 @@ Flags:
 - `--guild-id <guild_id>`: Guild ID to inspect. If omitted, prompts until valid numeric input.
 - `--format <text|json|csv>`: Output format. Default: `text`.
 - `--include-revoked`: Include invites marked as revoked (if Discord API returns them).
+- `--verbose`: Print extra progress and retry information to `stderr`.
 
 Invite creation flags:
 
@@ -165,6 +185,7 @@ Flags:
 - `--include-counts`: Include `member_count` in output.
   This count may be approximate without privileged member intent.
 - `--include-owner`: Include `owner_id` in output.
+- `--verbose`: Print extra progress information to `stderr`.
 
 Example:
 
@@ -176,6 +197,7 @@ python3.14 List_Guilds.py --format json --include-owner
 
 - Run any script without flags to use interactive prompts.
 - Make sure your bot has permissions required for the action.
+- Prefer the secure prompt over passing `--token` directly on the command line.
 - Never share your bot token.
 
 ## License

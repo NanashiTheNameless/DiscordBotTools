@@ -8,9 +8,18 @@ import getpass
 import json
 import os
 import sys
+from collections.abc import Callable
 from typing import Any
 
 import discord  # pyright: ignore[reportMissingImports]
+
+
+def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
+    def verbose(message: str) -> None:
+        if enabled:
+            print(f"[verbose] {message}", file=sys.stderr)
+
+    return verbose
 
 
 def prompt_token_with_mask(prompt: str = "Bot token: ") -> str:
@@ -116,11 +125,17 @@ def build_argparser() -> argparse.ArgumentParser:
         action="store_true",
         help="Include owner_id (no additional permissions required).",
     )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print extra progress information to stderr.",
+    )
     return p
 
 
 async def main() -> int:
     args = build_argparser().parse_args()
+    verbose = build_verbose_printer(args.verbose)
     token = args.token
     if not token:
         try:
@@ -143,6 +158,8 @@ async def main() -> int:
     @client.event
     async def on_ready():
         try:
+            verbose(f"Logged in as {client.user} (id: {client.user.id})")
+            verbose(f"Reading {len(client.guilds)} guild(s) from the ready cache.")
             for g in client.guilds:
                 item = {
                     "id": g.id,
@@ -155,6 +172,7 @@ async def main() -> int:
                 data["guilds"].append(item)
 
             data["guilds"].sort(key=lambda x: (x["name"] or "").lower())
+            verbose(f"Prepared {len(data['guilds'])} guild record(s).")
             done.set_result(True)
         except Exception as exc:
             done.set_exception(exc)
