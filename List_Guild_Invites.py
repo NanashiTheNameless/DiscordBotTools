@@ -28,7 +28,7 @@ except ImportError:
     readline = None
 
 T = TypeVar("T")
-RETRIABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
+RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
 TRANSIENT_HTTP_MARKERS = (
     "service unavailable",
     "upstream connect error",
@@ -49,9 +49,9 @@ def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
     return verbose
 
 
-def is_retriable_http_exception(exc: HTTPException) -> bool:
+def is_retryable_http_exception(exc: HTTPException) -> bool:
     status = getattr(exc, "status", None)
-    if status in RETRIABLE_HTTP_STATUSES:
+    if status in RETRYABLE_HTTP_STATUSES:
         return True
 
     message = str(exc).lower()
@@ -76,7 +76,7 @@ async def retry_http_request(
             return result
         except HTTPException as exc:
             last_exc = exc
-            if attempt >= attempts or not is_retriable_http_exception(exc):
+            if attempt >= attempts or not is_retryable_http_exception(exc):
                 raise
 
             delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
@@ -292,22 +292,31 @@ async def choose_channel_for_invite(
     verbose: Callable[[str], None],
 ) -> discord.abc.GuildChannel | None:
     if preferred_id:
+        async def fetch_preferred_channel() -> discord.abc.GuildChannel | None:
+            fetched_channel = await guild.fetch_channel(preferred_id)
+            if isinstance(fetched_channel, discord.Thread):
+                return None
+            return fetched_channel
+
         try:
-            ch = guild.get_channel(preferred_id)
+            ch: discord.abc.GuildChannel | None = guild.get_channel(preferred_id)
             if ch is None:
                 verbose(f"Fetching preferred invite channel {preferred_id}.")
                 ch = await retry_http_request(
                     "fetching preferred invite channel",
-                    lambda: guild.fetch_channel(preferred_id),
+                    fetch_preferred_channel,
                     verbose=verbose,
                 )
             return ch
         except (NotFound, Forbidden, HTTPException):
             return None
-    if guild.system_channel:
-        verbose(f"Using system channel {guild.system_channel.id} for invite creation.")
-        return guild.system_channel
+    system_channel = guild.system_channel
+    if system_channel is not None:
+        verbose(f"Using system channel {system_channel.id} for invite creation.")
+        return system_channel
     for ch in sorted(guild.text_channels, key=lambda c: (c.position, c.id)):
+        if ch is None:
+            continue
         verbose(f"Using text channel {ch.id} for invite creation.")
         return ch
     for ch in guild.channels:

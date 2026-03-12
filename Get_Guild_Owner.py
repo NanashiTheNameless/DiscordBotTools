@@ -26,7 +26,7 @@ except ImportError:
     readline = None
 
 T = TypeVar("T")
-RETRIABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
+RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
 TRANSIENT_HTTP_MARKERS = (
     "service unavailable",
     "upstream connect error",
@@ -47,9 +47,9 @@ def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
     return verbose
 
 
-def is_retriable_http_exception(exc: HTTPException) -> bool:
+def is_retryable_http_exception(exc: HTTPException) -> bool:
     status = getattr(exc, "status", None)
-    if status in RETRIABLE_HTTP_STATUSES:
+    if status in RETRYABLE_HTTP_STATUSES:
         return True
 
     message = str(exc).lower()
@@ -74,7 +74,7 @@ async def retry_http_request(
             return result
         except HTTPException as exc:
             last_exc = exc
-            if attempt >= attempts or not is_retriable_http_exception(exc):
+            if attempt >= attempts or not is_retryable_http_exception(exc):
                 raise
 
             delay = min(base_delay * (2 ** (attempt - 1)), max_delay)

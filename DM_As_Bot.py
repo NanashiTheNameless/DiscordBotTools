@@ -30,7 +30,7 @@ except ImportError:
     readline = None
 
 T = TypeVar("T")
-RETRIABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
+RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
 TRANSIENT_HTTP_MARKERS = (
     "service unavailable",
     "upstream connect error",
@@ -51,9 +51,9 @@ def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
     return verbose
 
 
-def is_retriable_http_exception(exc: HTTPException) -> bool:
+def is_retryable_http_exception(exc: HTTPException) -> bool:
     status = getattr(exc, "status", None)
-    if status in RETRIABLE_HTTP_STATUSES:
+    if status in RETRYABLE_HTTP_STATUSES:
         return True
 
     message = str(exc).lower()
@@ -78,7 +78,7 @@ async def retry_http_request(
             return result
         except HTTPException as exc:
             last_exc = exc
-            if attempt >= attempts or not is_retriable_http_exception(exc):
+            if attempt >= attempts or not is_retryable_http_exception(exc):
                 raise
 
             delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
@@ -551,13 +551,14 @@ async def run_terminal(
             )
             if message is None:
                 continue
+            last_editable_message: discord.Message = message
             try:
                 await retry_http_request(
-                    f"editing message {message.id}",
-                    lambda: message.edit(content=new_content),
+                    f"editing message {last_editable_message.id}",
+                    lambda: last_editable_message.edit(content=new_content),
                     verbose=verbose,
                 )
-                print(f"Edited message {message.id}")
+                print(f"Edited message {last_editable_message.id}")
             except Forbidden:
                 print("Error: Forbidden to edit this message.", file=sys.stderr)
             except HTTPException as exc:
@@ -619,10 +620,11 @@ async def run_terminal(
             )
             if message is None:
                 continue
+            target_editable_message: discord.Message = message
             try:
                 edited = await retry_http_request(
-                    f"editing message {message.id}",
-                    lambda: message.edit(content=new_content),
+                    f"editing message {target_editable_message.id}",
+                    lambda: target_editable_message.edit(content=new_content),
                     verbose=verbose,
                 )
                 last_bot_message_id = edited.id
