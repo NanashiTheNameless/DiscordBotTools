@@ -292,6 +292,7 @@ async def choose_channel_for_invite(
     verbose: Callable[[str], None],
 ) -> discord.abc.GuildChannel | None:
     if preferred_id:
+
         async def fetch_preferred_channel() -> discord.abc.GuildChannel | None:
             fetched_channel = await guild.fetch_channel(preferred_id)
             if isinstance(fetched_channel, discord.Thread):
@@ -321,7 +322,9 @@ async def choose_channel_for_invite(
         return ch
     for ch in guild.channels:
         if hasattr(ch, "create_invite"):
-            verbose(f"Using fallback channel {getattr(ch, 'id', 'unknown')} for invite creation.")
+            verbose(
+                f"Using fallback channel {getattr(ch, 'id', 'unknown')} for invite creation."
+            )
             return ch
     return None
 
@@ -412,7 +415,9 @@ async def main() -> int:
             should_create = args.create and (not args.only_if_none or len(invites) == 0)
             created_rec = None
             if should_create:
-                channel = await choose_channel_for_invite(guild, args.channel_id, verbose)
+                channel = await choose_channel_for_invite(
+                    guild, args.channel_id, verbose
+                )
                 if channel is None:
                     print(
                         "Error: Could not resolve a channel to create an invite in.",

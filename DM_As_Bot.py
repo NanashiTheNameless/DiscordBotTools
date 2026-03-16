@@ -8,8 +8,8 @@ import getpass
 import os
 import shutil
 import sys
-import threading
 import textwrap
+import threading
 from collections.abc import Awaitable, Callable
 from types import ModuleType
 from typing import TypeVar
@@ -266,9 +266,7 @@ def get_terminal_columns() -> int:
     return max(60, shutil.get_terminal_size(fallback=(100, 24)).columns)
 
 
-def expand_tabs_for_display(
-    text: str, *, start_column: int, tabsize: int = 8
-) -> str:
+def expand_tabs_for_display(text: str, *, start_column: int, tabsize: int = 8) -> str:
     expanded: list[str] = []
     column = start_column
     for char in text:
@@ -712,7 +710,7 @@ async def main() -> int:
     @client.event
     async def on_ready():
         nonlocal active_dm_channel_id
-        print(f"Logged in as {client.user} (id: {client.user.id})") # type: ignore
+        print(f"Logged in as {client.user} (id: {client.user.id})")  # type: ignore
         try:
             try:
                 verbose(f"Fetching user {user_id}.")
