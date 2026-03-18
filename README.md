@@ -193,6 +193,53 @@ Example:
 python3.14 List_Guilds.py --format json --include-owner
 ```
 
+### `List_Guild_Roles_Users.py`
+
+List roles in a guild, then list users that have one selected role.
+
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--guild-id <guild_id>`: Guild ID to inspect. If omitted, prompts until valid numeric input.
+- `--role-id <role_id>`: Role ID to inspect. If omitted, script prints available roles and prompts.
+- `--format <text|json|csv>`: Output format. Default: `text`.
+- `--include-everyone`: Include `@everyone` in role listings and allow selecting it.
+- `--include-bots`: Include bot users in member output.
+- `--verbose`: Print extra progress and retry information to `stderr`.
+
+Notes:
+
+- The bot must have guild member access and Server Members Intent enabled to list role members reliably.
+
+Example:
+
+```bash
+python3.14 List_Guild_Roles_Users.py --guild-id 123456789012345678
+```
+
+### `List_Guild_Users.py`
+
+List users in a guild.
+
+Flags:
+
+- `--token <bot_token>`: Bot token to log in with. If omitted, prompts securely.
+- `--guild-id <guild_id>`: Guild ID to inspect. If omitted, prompts until valid numeric input.
+- `--format <text|json|csv>`: Output format. Default: `text`.
+- `--include-bots`: Include bot users in output.
+- `--include-roles`: Include each user's role IDs in output.
+- `--verbose`: Print extra progress and retry information to `stderr`.
+
+Notes:
+
+- The bot must have guild member access and Server Members Intent enabled to list members reliably.
+
+Example:
+
+```bash
+python3.14 List_Guild_Users.py --guild-id 123456789012345678 --format json
+```
+
 ## Notes
 
 - Run any script without flags to use interactive prompts.
