@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from typing import TypedDict, TypeVar
 
 import discord  # pyright: ignore[reportMissingImports]
 from discord.errors import (  # pyright: ignore[reportMissingImports]
@@ -38,6 +38,34 @@ TRANSIENT_HTTP_MARKERS = (
     "gateway timeout",
     "temporarily unavailable",
 )
+
+
+class GuildRecord(TypedDict):
+    id: int
+    name: str
+
+
+class RoleRecord(TypedDict):
+    id: int
+    name: str
+    position: int
+    mention: str
+    is_default: bool
+
+
+class MemberRecord(TypedDict):
+    id: int
+    tag: str
+    name: str
+    display_name: str
+    bot: bool
+    role_ids: list[int]
+
+
+class State(TypedDict):
+    guild: GuildRecord | None
+    roles: list[RoleRecord]
+    members: list[MemberRecord]
 
 
 def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
@@ -306,7 +334,7 @@ async def main() -> int:
     client = discord.Client(intents=intents)
     done = asyncio.get_running_loop().create_future()
 
-    state: dict[str, object] = {
+    state: State = {
         "guild": None,
         "roles": [],
         "members": [],
@@ -347,7 +375,7 @@ async def main() -> int:
             if not args.include_everyone:
                 roles = [role for role in roles if not role.is_default()]
 
-            role_records = [
+            role_records: list[RoleRecord] = [
                 {
                     "id": role.id,
                     "name": role.name,
@@ -376,7 +404,7 @@ async def main() -> int:
                 done.set_result(False)
                 return
 
-            member_records = []
+            member_records: list[MemberRecord] = []
             for member in members:
                 member_records.append(
                     {
@@ -416,9 +444,12 @@ async def main() -> int:
         return 1
 
     guild_info = state["guild"]
+    if guild_info is None:
+        print("Error: Guild information was not loaded.", file=sys.stderr)
+        return 1
     roles = list(state["roles"])
     members = list(state["members"])
-    role_lookup = {int(role["id"]): role for role in roles}
+    role_lookup = {role["id"]: role for role in roles}
 
     role_id = args.role_id
     if role_id is None:

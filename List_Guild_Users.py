@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from typing import TypedDict, TypeVar
 
 import discord  # pyright: ignore[reportMissingImports]
 from discord.errors import (  # pyright: ignore[reportMissingImports]
@@ -38,6 +38,25 @@ TRANSIENT_HTTP_MARKERS = (
     "gateway timeout",
     "temporarily unavailable",
 )
+
+
+class GuildRecord(TypedDict):
+    id: int
+    name: str
+
+
+class MemberRecord(TypedDict):
+    id: int
+    tag: str
+    name: str
+    display_name: str
+    bot: bool
+    role_ids: list[int]
+
+
+class State(TypedDict):
+    guild: GuildRecord | None
+    members: list[MemberRecord]
 
 
 def build_verbose_printer(enabled: bool) -> Callable[[str], None]:
@@ -296,7 +315,7 @@ async def main() -> int:
 
     client = discord.Client(intents=intents)
     done = asyncio.get_running_loop().create_future()
-    state: dict[str, object] = {
+    state: State = {
         "guild": None,
         "members": [],
     }
@@ -350,7 +369,7 @@ async def main() -> int:
                 done.set_result(False)
                 return
 
-            member_records = []
+            member_records: list[MemberRecord] = []
             for member in members:
                 if not args.include_bots and member.bot:
                     continue
@@ -392,6 +411,9 @@ async def main() -> int:
         return 1
 
     guild_info = state["guild"]
+    if guild_info is None:
+        print("Error: Guild information was not loaded.", file=sys.stderr)
+        return 1
     members = list(state["members"])
 
     if args.format == "json":
