@@ -463,7 +463,8 @@ async def main() -> int:
                     parts.append("bot=true")
                 if args.include_roles:
                     parts.append(
-                        "role_ids=" + "|".join(str(role_id) for role_id in member["role_ids"])
+                        "role_ids="
+                        + "|".join(str(role_id) for role_id in member["role_ids"])
                     )
                 print(" - " + "  ".join(parts))
 

@@ -526,10 +526,7 @@ async def main() -> int:
             )
     else:
         print(f"Guild: {guild_info['name']} ({guild_info['id']})")
-        print(
-            "Selected role: "
-            f"{selected_role['name']} ({selected_role['id']})"
-        )
+        print("Selected role: " f"{selected_role['name']} ({selected_role['id']})")
         print(f"Matching users: {len(users_with_role)}")
         if not users_with_role:
             print("No users matched this role.")
