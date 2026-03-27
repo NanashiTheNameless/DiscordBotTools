@@ -17,7 +17,7 @@ This license lets people use, study, share, and modify the Work under firm ethic
 - **Adaptation**: Any modification, derivative, translation, aggregation with, or inclusion of the Work into another work, including as a library or component.
 - **Share**: To provide the Work or Adaptations to any third party, by any means, including download, hosting, software-as-a-service (SaaS), APIs, containers, or device preinstallation.
 - **Non-Commercial**: Not primarily intended for or directed toward commercial advantage or monetary compensation of any kind. This includes (without limitation) direct sales, subscriptions, SaaS fees, paid support, training, consulting, advertising, sponsorship, affiliate links, data monetization, bundling tied to a paid product/service, and any internal deployment primarily supporting revenue-generating activity.
-- **Non-Rewarded Donation**: A voluntary monetary contribution that provides **no goods, services, access, features, priority, advertising, sponsorship, acknowledgments of a promotional nature, or any other consideration** to the donor. Neutral, non-promotional listing of donor names (without logos, non-profile links, or prominence) is not a "reward."
+- **Non-Rewarded Donation**: A voluntary monetary contribution that provides **no goods, services, access, features, priority, advertising, sponsorship, acknowledgments of a promotional nature, or any other consideration** to the donor. Neutral, non-promotional listing of donor names (without logos, non-profile links, or prominence) is not a "reward".
 - **Policy**: The ethical standards and prohibitions in Section 4 and the attribution/notice duties in Section 3.
 
 ---
