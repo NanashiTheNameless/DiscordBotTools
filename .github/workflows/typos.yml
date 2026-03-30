@@ -39,7 +39,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Create Pull Request with fixes
-        uses: NanashiTheNameless/create-pull-request@363ea9baed2f0865afb2a7ee4b5b0724551e9359
+        uses: NanashiTheNameless/create-pull-request@7ff31b890035759d3d7df63e76f5afa54cf0f617
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/typos-auto-fixes
