@@ -250,3 +250,14 @@ python3.14 List_Guild_Users.py --guild-id 123456789012345678 --format json
 ## License
 
 See [LICENSE.md](<https://github.com/NanashiTheNameless/DiscordBotTools/blob/main/LICENSE.md>).
+
+## Support My Work
+
+If this project is useful to you, you can support it here:
+
+- [<https://github.com/sponsors/NanashiTheNameless>](<https://github.com/sponsors/NanashiTheNameless>)
+- [<https://buymeacoffee.com/NamelessNanashi>](<https://buymeacoffee.com/NamelessNanashi>)
+- [<https://ko-fi.com/NanashiTheNameless>](<https://ko-fi.com/NanashiTheNameless>)
+- [<https://liberapay.com/NamelessNanashi>](<https://liberapay.com/NamelessNanashi>)
+- [<https://thanks.dev/u/gh/NanashiTheNameless>](<https://thanks.dev/u/gh/NanashiTheNameless>)
+- [<https://throne.com/NamelessNanashi>](<https://throne.com/NamelessNanashi>)
