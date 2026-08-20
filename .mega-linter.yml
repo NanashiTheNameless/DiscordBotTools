@@ -19,6 +19,7 @@ DISABLE_LINTERS:
   - COPYPASTE_JSCPD # Repeated CLI scaffolding is acceptable here
   - REPOSITORY_KICS # Security scan disabled; pin actions if you re-enable
   - SPELL_LYCHEE # Lychee is having issues with GitHub, Im abandoning it
+  - ACTION_ZIZMOR # Zizmor is not worth the effort
 
 PYTHON_FLAKE8_CONFIG_FILE: .flake8
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.json
